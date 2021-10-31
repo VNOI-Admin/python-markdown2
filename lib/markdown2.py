@@ -1003,7 +1003,7 @@ class Markdown(object):
 
     _hr_re = re.compile(r'^[ ]{0,3}([-_*][ ]{0,2}){3,}$', re.M)
 
-    def _run_block_gamut(self, text, is_recursive=False):
+    def _run_block_gamut(self, text, recursion_deep=0):
         # These are all the transformations that form block-level
         # tags like paragraphs, headers, and list items.
 
@@ -1028,10 +1028,14 @@ class Markdown(object):
             text = self._do_wiki_tables(text)
         if "tables" in self.extras:
             text = self._do_tables(text)
-        if not is_recursive:
+        if recursion_deep == 0:
             text = self._do_code_blocks(text)
 
-        text = self._do_block_quotes(text)
+        # User can spam a very long string `>! >! ...`
+        # which causes stack overflow because of recursion
+        if recursion_deep <= 10:
+            self.current_recursion_deep = recursion_deep + 1
+            text = self._do_block_quotes(text, recursion_deep + 1)
 
         # We already ran _HashHTMLBlocks() before, in Markdown(), but that
         # was to escape raw HTML in the original Markdown source. This time,
@@ -1223,7 +1227,7 @@ class Markdown(object):
 
         if "strike" in self.extras:
             text = self._do_strike(text)
-        
+
         # Must come after _do_strike because of the delim ~
         if "latex" in self.extras:
             text = self._do_latex(text)
@@ -2132,7 +2136,7 @@ class Markdown(object):
             bq = self._bq_one_level_re.sub('', bq)
         # trim whitespace-only lines
         bq = self._ws_only_line_re.sub('', bq)
-        bq = self._run_block_gamut(bq, is_recursive=True)          # recurse
+        bq = self._run_block_gamut(bq, self.current_recursion_deep)          # recurse
 
         bq = re.sub('(?m)^', '  ', bq)
         # These leading spaces screw with <pre> content, so we need to fix that:
@@ -2143,7 +2147,7 @@ class Markdown(object):
         else:
             return '<blockquote>\n%s\n</blockquote>\n\n' % bq
 
-    def _do_block_quotes(self, text):
+    def _do_block_quotes(self, text, recursion_deep=0):
         if '>' not in text:
             return text
         if 'spoiler' in self.extras:
