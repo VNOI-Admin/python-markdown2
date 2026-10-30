@@ -1,0 +1,8 @@
+Inline ~a_i * b_i~ and ~\{x\}~, but ~~strike~~ still works.
+
+$$\sum_{i=1}^n a_i \\ b < c$$
+
+- item ~x_1~
+
+>! spoiler ~y_1~
+>!     not a code block

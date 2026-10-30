@@ -4292,6 +4292,45 @@ class Strike(Extra):
         return '~~' in text
 
 
+class VnojLatex(Extra):
+    '''
+    VNOJ: leave `~...~` and `$$...$$` untouched by markdown so the client-side
+    math renderer receives the raw TeX (backslash escapes included).
+    '''
+    name = 'vnoj-latex'
+    # hash right after strike (so `~~x~~` wins over `~x~`), restore before unescaping
+    order = (Stage.POSTPROCESS,), (Strike,)
+
+    _latex_re = re.compile(r'(~.*?~)|(\$\$.*?\$\$)', re.S)
+    _hash_re = re.compile(r'md5-[0-9a-f]{32}')
+
+    def __init__(self, md: Markdown, options: Optional[dict]):
+        super().__init__(md, options)
+        self.blocks: dict[str, str] = {}
+        self._escaped = {v: k for k, v in md._escape_table.items()}
+
+    def _hash(self, match: re.Match[str]) -> str:
+        key = _hash_text(match.group())
+        self.blocks[key] = match.group()
+        return key
+
+    def _unescape(self, match: re.Match[str]) -> str:
+        # put back the backslash markdown consumed, e.g. `\{` -> `\{` not `{`
+        key = match.group()
+        return '\\' + self._escaped[key] if key in self._escaped else key
+
+    def _restore(self, match: re.Match[str]) -> str:
+        latex = self.blocks.get(match.group())
+        if latex is None:
+            return match.group()
+        return self._hash_re.sub(self._unescape, latex)
+
+    def run(self, text: str) -> str:
+        if self.md.stage == Stage.POSTPROCESS:
+            return self._hash_re.sub(self._restore, text) if self.blocks else text
+        return self._latex_re.sub(self._hash, text)
+
+
 class Tables(Extra):
     '''
     Tables using the same format as GFM
@@ -4618,6 +4657,7 @@ Strike.register()
 Tables.register()
 TelegramSpoiler.register()
 Underline.register()
+VnojLatex.register()
 Wavedrom.register()
 WikiLinks.register()
 WikiTables.register()
