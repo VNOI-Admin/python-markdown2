@@ -61,6 +61,11 @@ see <https://github.com/trentm/python-markdown2/wiki/Extras> for details):
   markers are left out of it.
 * highlightjs-lang: Allows specifying the language which used for syntax
   highlighting when using fenced-code-blocks and highlightjs.
+* html-allowlist: VNOJ: takes a collection of lowercase tag names. Raw HTML
+  tags outside of it are escaped instead of passed through, so they show up as
+  text (e.g. `a<b, c>d`). Attributes are left to a sanitizer to clean. Tags
+  markdown generates (p, h1-h6, ...) are checked too, so list them. If `math`
+  is allowed, the tags inside it are not checked.
 * html-classes: Takes a dict mapping html tag names (lowercase) to a
   string to use for a "class" tag attribute. Currently only supports "img",
   "table", "thead", "pre", "code", "ul" and "ol" tags. Add an issue if you require
@@ -999,6 +1004,8 @@ class Markdown:
                     l_key, "\n\n"])
         elif self.extras.get('header-ids', {}).get('mixed') and self._h_tag_re.match(html):
             html = self._h_tag_re.sub(self._h_tag_sub, html)
+        if 'html-allowlist' in self.extras:
+            html = self._escape_disallowed_tags(html)
         key = _hash_text(html)
         self.html_blocks[key] = html
         return "\n\n" + key + "\n\n"
@@ -1357,6 +1364,10 @@ class Markdown:
         # delimiters in inline links like [this](<url>).
         text = self._do_auto_links(text)
 
+        # VNOJ: after auto-links, so `<https://...>` is already an <a> tag
+        if 'html-allowlist' in self.extras:
+            text = self._escape_disallowed_tags(text)
+
         text = self._encode_amps_and_angles(text)
 
         text = self._do_italics_and_bold(text)
@@ -1429,6 +1440,34 @@ class Markdown:
                 )
             is_html_markup = not is_html_markup
         return ''.join(escaped)
+
+    # VNOJ: a tag name runs from `<` up to whitespace, `/` or `>`, like an HTML parser reads it (`a<b, c>d` -> `b,`),
+    # and the tag needs a `>` before the next `<` (`a<b` at the end of a paragraph is not a tag)
+    _tag_name_re = re.compile(r'<(/?)([^\s/<>]*)([^<>]*>)?')
+
+    def _tag_name_sub(self, match: re.Match[str]) -> str:
+        name = match.group(2)
+        if name[:1].isalpha() and (match.group(3) is None or name.lower() not in self.extras['html-allowlist']):
+            return '&lt;' + match.group(0)[1:]
+        return match.group(0)
+
+    _math_re = re.compile(r'<math\b.*?</math\s*>', re.S | re.I)
+
+    def _escape_disallowed_tags(self, html: str) -> str:
+        '''VNOJ: escape the tags outside of the `html-allowlist` extra, so they read as text.
+
+        If `math` is allowed, tags inside it are left to the sanitizer.
+        '''
+        if 'math' not in self.extras['html-allowlist'] or '<math' not in html:
+            return self._tag_name_re.sub(self._tag_name_sub, html)
+        parts = []
+        start = 0
+        for match in self._math_re.finditer(html):
+            parts.append(self._tag_name_re.sub(self._tag_name_sub, html[start:match.start()]))
+            parts.append(match.group(0))
+            start = match.end()
+        parts.append(self._tag_name_re.sub(self._tag_name_sub, html[start:]))
+        return ''.join(parts)
 
     def _is_auto_link(self, text):
         if ':' in text:

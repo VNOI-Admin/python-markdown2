@@ -1,0 +1,19 @@
+### Given 4 numbers a b c d that a<b, c>d
+
+Allowed <b>bold</b>, not allowed <script>alert(1)</script> and <foo  a=1>.
+
+Math ~(L<N\le 5)~ and ~a<b~, an autolink <https://vnoi.info> and a <!-- comment -->.
+
+<div>
+<iframe src="x"></iframe> and <b>bold</b>
+</div>
+
+| a<b | <b>c</b> |
+| --- | --- |
+| <i>x</i> | y |
+
+C++ `vector<int>` written as vector<int> v; and MathML <math><mi>N</mi><mo>&lt;</mo></math> inline.
+
+<math>
+<semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics>
+</math>
