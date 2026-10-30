@@ -1322,7 +1322,9 @@ class Markdown:
 
         text = self._do_lists(text)
 
-        text = self._do_code_blocks(text)
+        # VNOJ: indented code blocks are disabled inside blockquotes and spoilers
+        if not self._bq_depth:
+            text = self._do_code_blocks(text)
 
         # VNOJ: user can spam `>! >! >! ...` which overflows the stack via recursion
         if self._bq_depth <= 10:
