@@ -394,6 +394,7 @@ class Markdown:
         self.html_blocks = {}
         self.html_spans = {}
         self.list_level = 0
+        self._bq_depth = 0
         self.extras = self._instance_extras.copy()
         self._setup_extras()
         self._toc = []
@@ -1323,7 +1324,9 @@ class Markdown:
 
         text = self._do_code_blocks(text)
 
-        text = self._do_block_quotes(text)
+        # VNOJ: user can spam `>! >! >! ...` which overflows the stack via recursion
+        if self._bq_depth <= 10:
+            text = self._do_block_quotes(text)
 
         # We already ran _HashHTMLBlocks() before, in Markdown(), but that
         # was to escape raw HTML in the original Markdown source. This time,
@@ -2211,7 +2214,11 @@ class Markdown:
             bq = self._bq_one_level_re.sub('', bq)
         # trim whitespace-only lines
         bq = self._ws_only_line_re.sub('', bq)
-        bq = self._run_block_gamut(bq)          # recurse
+        self._bq_depth += 1
+        try:
+            bq = self._run_block_gamut(bq)          # recurse
+        finally:
+            self._bq_depth -= 1
 
         bq = re.sub('(?m)^', '  ', bq)
         # These leading spaces screw with <pre> content, so we need to fix that:
